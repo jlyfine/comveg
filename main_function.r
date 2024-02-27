@@ -1,6 +1,3 @@
-
-
-
 require(VineCopula)
 require(foreach)
 require(doParallel)
@@ -14,7 +11,6 @@ require(abind)
 
 ##
 ###################lmf calculation###############################
-
 
 fpall = '/GPUFS/ygo_fwf_1/00junli/01next_step/GCM_all_data_his_126_245_370_585/all_gcm_da'
 get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, window_yr=40){
