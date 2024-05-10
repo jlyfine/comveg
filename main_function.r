@@ -79,8 +79,8 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
         lmf2_dep_sm_sd_mean = (1 - sm__thre  - threshold + BiCopCDF(sm__thre, threshold, cop_bgc_2))
         lmf2_dep_ta_sd_mean = (1 - threshold - ta__thre  + BiCopCDF(threshold, ta__thre, cop_bgc_2))
         
-        ta__thre_detrend = cdfnor(quanor(threshold, para=c(mean(tas_1 , na.rm=T), sd(tas_1 , na.rm=T))), para=c(mean(tas_1 , na.rm=T), sd(tas_2 , na.rm=T)))
-        sm__thre_detrend = cdfnor(quanor(threshold, para=c(mean(mrso_1, na.rm=T), sd(mrso_1, na.rm=T))), para=c(mean(mrso_1, na.rm=T), sd(mrso_2, na.rm=T)))
+        ta__thre_detrend = cdfnor(quanor(threshold, para=c(0, sd(tas_1 , na.rm=T))), para=c(0, sd(tas_2 , na.rm=T)))
+        sm__thre_detrend = cdfnor(quanor(threshold, para=c(0, sd(mrso_1, na.rm=T))), para=c(0, sd(mrso_2, na.rm=T)))
         
         lmf2_dep_sm_sd    = (1 - sm__thre_detrend  - threshold         + BiCopCDF(sm__thre_detrend, threshold       , cop_bgc_2))
         lmf2_dep_ta_sd    = (1 - threshold         - ta__thre_detrend  + BiCopCDF(threshold       , ta__thre_detrend, cop_bgc_2))
