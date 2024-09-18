@@ -10,6 +10,6 @@ The code can be directly run in the R language across Windows and Linux platform
 There is no need to spend time installing this code, just configure the required language packs in 1。
 
 3. Instructions for use
-
+To run this code, you need processed CMIP6 data
 
 
