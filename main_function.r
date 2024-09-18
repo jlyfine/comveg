@@ -237,7 +237,352 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
 
 ###################tran-induced change##########################################################
 
+decompose_own = function(x, type = c("additive", "multiplicative"), filter = NULL, window_yr){
+  #x = x_mrso_ij
+  type <- match.arg(type)
+  
+  if (anyNA(x)) {
+    x <- na.interp(x, lambda = NULL) }
+  l <- length(x)
+  f <- frequency(x)
+  if (f <= 1 || length(na.omit(x)) < 2 * f) 
+    stop("time series has no or less than 2 periods")
+  if (is.null(filter)) 
+    filter <- if (!f%%2) 
+      c(0.5, rep_len(1, f - 1), 0.5)/f
+  else rep_len(1, f)/f
+  trend <- filter(x, filter)
+  season <- if (type == "additive") 
+    x - trend
+  else x/trend
+  
+  periods <- l%/%f
+  index <- (seq.int(1L, l, by = f) - 1L)[1:window_yr]
+  #index <- seq.int(1L, 349, by = f) - 1L
+  figure <- numeric(f)
+  for (i in 1L:f) figure[i] <- mean(season[index + i], na.rm = TRUE)
+  figure <- if (type == "additive") 
+    figure - mean(figure)
+  else figure/mean(figure)
+  seasonal <- ts(rep(figure, periods + 1)[seq_len(l)], start = start(x), 
+                 frequency = f)
+  structure(list(x = x, seasonal = seasonal, trend = trend, 
+                 random = if (type == "additive") x - seasonal - trend else x/seasonal/trend, 
+                 figure = figure, type = type), class = "decomposed.ts")
+}
+cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
+  
+  
+  get_re_sm_mean_g = function(fpall, modelnai, scenario, window_yr=window_yr){
+    
+    #window_yr=30; modelnai = modelna[01]; scenario='_ssp585_'
+    setwd(fpall)
+    fp_file = list.files(fpall)
+    for (k in 1:length(fp_file)) {#k=10
+      con_tas    = grepl(c('tas'         ), fp_file[k])
+      con_mrso_  = grepl(c('mrso_'       ), fp_file[k])
+      con_mrro_  = grepl(c('mrro_'       ), fp_file[k])
+      con__lai   = grepl(c('lai_L'       ), fp_file[k])
+      con_et     = grepl(c('evspsbl_A'   ), fp_file[k])#
+      con_tran   = grepl(c('tran_L'      ), fp_file[k])#evspsbl_A
+      con_rsds   = grepl(c('rsds'        ), fp_file[k])
+      con_rsus   = grepl(c('rsus'        ), fp_file[k])
+      con_ts     = grepl(c('ts_A'        ), fp_file[k])
+      con_hfss   = grepl(c('hfss_A'      ), fp_file[k])
+      con_wind   = grepl(c('sfcWind_A'   ), fp_file[k])
+      con_pr     = grepl(c('pr_A'        ), fp_file[k])
+      con_his    = grepl(c('_historical_'), fp_file[k])
+      con_ssp585 = grepl(c(scenario      ), fp_file[k])
+      con_modelna= grepl(c(modelnai      ), fp_file[k])
+      
+      if(con_tas   & con_his & con_modelna) {tas__his_bgcna = fp_file[k]}
+      if(con_mrso_ & con_his & con_modelna) {mrso_his_bgcna = fp_file[k]}
+      if(con_mrro_ & con_his & con_modelna) {mrro_his_bgcna = fp_file[k]}
+      if(con__lai  & con_his & con_modelna) {lai__his_bgcna = fp_file[k]}
+      if(con_et    & con_his & con_modelna) {et_his_bgcna   = fp_file[k]}
+      if(con_tran  & con_his & con_modelna) {tranhis_bgcna  = fp_file[k]}
+      if(con_rsds  & con_his & con_modelna) {rsds_his_bgcna = fp_file[k]}
+      if(con_rsus  & con_his & con_modelna) {rsus_his_bgcna = fp_file[k]}
+      if(con_ts    & con_his & con_modelna) {ts_his_bgcna   = fp_file[k]}
+      if(con_hfss  & con_his & con_modelna) {hfss_his_bgcna = fp_file[k]}
+      if(con_wind  & con_his & con_modelna) {wind_his_bgcna = fp_file[k]}
+      if(con_pr    & con_his & con_modelna) {pr_his_bgcna   = fp_file[k]}
+      
+      if(con_tas   & con_ssp585 & con_modelna) {tas__ssp_bgcna = fp_file[k]}
+      if(con_mrso_ & con_ssp585 & con_modelna) {mrso_ssp_bgcna = fp_file[k]}
+      if(con_mrro_ & con_ssp585 & con_modelna) {mrro_ssp_bgcna = fp_file[k]}
+      if(con__lai  & con_ssp585 & con_modelna) {lai__ssp_bgcna = fp_file[k]}
+      if(con_et    & con_ssp585 & con_modelna) {et_ssp_bgcna   = fp_file[k]}
+      if(con_tran  & con_ssp585 & con_modelna) {transsp_bgcna  = fp_file[k]}
+      if(con_rsds  & con_ssp585 & con_modelna) {rsds_ssp_bgcna = fp_file[k]}
+      if(con_rsus  & con_ssp585 & con_modelna) {rsus_ssp_bgcna = fp_file[k]}
+      if(con_ts    & con_ssp585 & con_modelna) {ts_ssp_bgcna   = fp_file[k]}
+      if(con_hfss  & con_ssp585 & con_modelna) {hfss_ssp_bgcna = fp_file[k]}
+      if(con_wind  & con_ssp585 & con_modelna) {wind_ssp_bgcna = fp_file[k]}
+      if(con_pr    & con_ssp585 & con_modelna) {pr_ssp_bgcna   = fp_file[k]}
+    }
+    tas__his = readRDS(tas__his_bgcna)
+    tran_his = readRDS(tranhis_bgcna )
+    mrso_his = readRDS(mrso_his_bgcna)
+    mrro_his = readRDS(mrro_his_bgcna)
+    rsds_his = readRDS(rsds_his_bgcna)
+    ts___his = readRDS(ts_his_bgcna  )
+    pr___his = readRDS(pr_his_bgcna  )#rsus_his = readRDS(rsus_his_bgcna)
+   #wind_his = readRDS(wind_his_bgcna)#lai__his = readRDS(lai__his_bgcna)
+    
+    tas__ssp = readRDS(tas__ssp_bgcna)
+    tran_ssp = readRDS(transsp_bgcna )
+    mrso_ssp = readRDS(mrso_ssp_bgcna)
+    mrro_ssp = readRDS(mrro_ssp_bgcna)
+    rsds_ssp = readRDS(rsds_ssp_bgcna)
+    ts___ssp = readRDS(ts_ssp_bgcna  )
+    pr___ssp = readRDS(pr_ssp_bgcna  )#lai__ssp = readRDS(lai__ssp_bgcna)
+   #wind_ssp = readRDS(wind_ssp_bgcna)#rsus_ssp = readRDS(rsus_ssp_bgcna)
+    
+    tas__bgc = abind(tas__his, tas__ssp); rm(tas__his); rm(tas__ssp); print(dim(tas__bgc))
+    mrso_bgc = abind(mrso_his, mrso_ssp); rm(mrso_his); rm(mrso_ssp); print(dim(mrso_bgc))
+    mrro_bgc = abind(mrro_his, mrro_ssp); rm(mrro_his); rm(mrro_ssp); print(dim(mrro_bgc))
+    tran_bgc = abind(tran_his, tran_ssp); rm(tran_his); rm(tran_ssp); print(dim(tran_bgc))
+    rsds_bgc = abind(rsds_his, rsds_ssp); rm(rsds_his); rm(rsds_ssp); print(dim(rsds_bgc))
+    ts___bgc = abind(ts___his, ts___ssp); rm(ts___his); rm(ts___ssp); print(dim(ts___bgc))
+    pr___bgc = abind(pr___his, pr___ssp); rm(pr___his); rm(pr___ssp); print(dim(pr___bgc))#rsus_bgc = abind(rsus_his, rsus_ssp); rm(rsus_his); rm(rsus_ssp); print(dim(rsus_bgc))
+   #wind_bgc = abind(wind_his, wind_ssp); rm(wind_his); rm(wind_ssp); print(dim(wind_bgc))#lai__bgc = abind(lai__his, lai__ssp); rm(lai__his); rm(lai__ssp); print(dim(lai__bgc))
+    
+    rm(wind_bgc); gc()
+    
+    sca=3
+    yr=2100-1850+1
+    len = yr-window_yr+1
+    nrow1=240
+    ncol1=93
+    da_tran_sm         = array(NA, c(nrow1,ncol1,3  ))     
+    lai_tas_mean1_c    = array(NA, c(nrow1,ncol1,len))     
+    lai_tas_sd1_c      = array(NA, c(nrow1,ncol1,len))   
+    lai_sm_mean0_c     = array(NA, c(nrow1,ncol1,len))    
+    lai_sm_mean1_c     = array(NA, c(nrow1,ncol1,len))    
+    lai_sm_sd0_c       = array(NA, c(nrow1,ncol1,len))  
+    lai_sm_sd1_c       = array(NA, c(nrow1,ncol1,len))  
+    lai_cov_c0         = array(NA, c(nrow1,ncol1,len))
+    lai_cov_c1         = array(NA, c(nrow1,ncol1,len))
+    cov_tran_c01       = array(NA, c(nrow1,ncol1,len))
+    lai_sm_lai_tas_cor = matrix(NA, nrow=nrow1, ncol=ncol1)
+    lucc = readRDS('/GPUFS/ygo_fwf_1/00junli/01next_step/lucc2016_1.5degree_vegetated_area.rds');col=1
+    for (i in 1:nrow(tas__bgc)) {
+      for (j in 1:ncol(tas__bgc)) {
+        if(is.na(lucc[i,j]) | is.na(tas__bgc[i,j,1]) | 
+           is.na(mrso_bgc[i,j,1]) | is.na(pr___bgc[i,j,1]) | is.na(tran_bgc[i,j,1])) next
+        #i=200;j=80;image.plot(1:240,1:93,tas__bgc[,,8]);abline(v=i,h=j); gc()
+        tas__ij  = rowMeans(embed(c(tas__bgc[i,j,],rep(NA, sca-1)), sca), na.rm=T)
+        loca_bgc = which.max(rowMeans(matrix(tas__ij, ncol=yr), na.rm=T))
+        locaij = sort(embed(c(1:12,1,2),3)[loca_bgc,])
+        loca_sel = embed(1:yr, window_yr)
+        
+        x_mrso_ij     = ts(mrso_bgc[i,j,]         , frequency=12)
+        x_mrro_ij     = ts(mrro_bgc[i,j,]*86400*30, frequency=12)
+        x_tran_ij_sm  = ts(tran_bgc[i,j,]*86400*30, frequency=12)
+        x_pr___ij_sm  = ts(pr___bgc[i,j,]*86400*30, frequency=12)
+        x_tran_ij_tas = ts(tran_bgc[i,j,]         , frequency=12)
+        
+        mrso_ij    = try(decompose_own(x_mrso_ij    , type = "additive", window_yr = window_yr), silent = T)
+        mrro_ij    = try(decompose_own(x_mrro_ij    , type = "additive", window_yr = window_yr), silent = T)
+        tran_ij_sm = try(decompose_own(x_tran_ij_sm , type = "additive", window_yr = window_yr), silent = T)
+        pr___ij_sm = try(decompose_own(x_pr___ij_sm , type = "additive", window_yr = window_yr), silent = T)
+        tran_ij_tas= try(decompose_own(x_tran_ij_tas, type = "additive", window_yr = window_yr), silent = T)
+        
+        tranij_raw  = tran_bgc[i,j,]
+        tasij_raw   = tas__bgc[i,j,]
+        #ra_ij_raw   = ra___bgc[i,j,]
+        #ts_ij_raw   = ts___bgc[i,j,]
+        #sw_ij_raw   = rsds_bgc[i,j,]
+        if(class(mrso_ij    )[1] != "try-error" &
+           class(mrro_ij    )[1] != "try-error" &
+           class(tran_ij_sm )[1] != "try-error" &
+           class(pr___ij_sm )[1] != "try-error" &
+           class(tran_ij_tas)[1] != "try-error"){
+          
+          getre = function(mrso_ij  ,mrro_ij, tran_ij_sm,pr___ij_sm,tran_ij_tas, tranij_raw,tasij_raw,id1=09:3008, id2=c(1:6), yr=251){
+            return(list(mrso_ijk     = matrix(mrso_ij    [id1], ncol=yr)[id2,],
+                        mrro_ijk     = matrix(mrro_ij    [id1], ncol=yr)[id2,],
+                        tran_ijk_sm  = matrix(tran_ij_sm [id1], ncol=yr)[id2,],
+                        pr___ijk_sm  = matrix(pr___ij_sm [id1], ncol=yr)[id2,],
+                        tran_ijk_tas = matrix(tran_ij_tas[id1], ncol=yr)[id2,],
+                        tranij_raw   = matrix(tranij_raw [id1], ncol=yr)[id2,],
+                        tasij_raw    = matrix(tasij_raw  [id1], ncol=yr)[id2,])) 
+            }
+          
+          if(loca_bgc==12){
+            id1 = 09:3008; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==11){
+              id1 = 08:3007; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==1){
+                id1 = 10:3009; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==2){
+                  id1 = 11:3010; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==3){
+                    id1 = 12:3011; id2 = c(1:6); yr1 = 2100-1850 }else{
+                      id1 = 1:3012; id2 = c((min(locaij)-3):max(locaij)); yr1 = 2100-1850+1
+                    }
+          
+          mrso_ij_1     = mrso_ij    $random# - mrso_ij    [,2] - rep(rowMeans(matrix(mrso_ij    [,3], ncol=(2100-1850+1)), na.rm=T), (2100-1850+1))
+          mrro_ij_1     = mrro_ij    $random# - mrso_ij    [,2] - rep(rowMeans(matrix(mrso_ij    [,3], ncol=(2100-1850+1)), na.rm=T), (2100-1850+1))
+          tran_ij_sm_1  = tran_ij_sm $random# - tran_ij_sm [,2] - rep(rowMeans(matrix(tran_ij_sm [,3], ncol=(2100-1850+1)), na.rm=T), (2100-1850+1))
+          pr___ij_sm_1  = pr___ij_sm $random# - pr___ij_sm [,2] - rep(rowMeans(matrix(pr___ij_sm [,3], ncol=(2100-1850+1)), na.rm=T), (2100-1850+1))
+          tran_ij_tas_1 = tran_ij_tas$random# - tran_ij_tas[,2] - rep(rowMeans(matrix(tran_ij_tas[,3], ncol=(2100-1850+1)), na.rm=T), (2100-1850+1))
+          tranij_raw_1  = tran_ij_tas$trend
+          
+          dare1 = getre(mrso_ij_1,mrro_ij_1,tran_ij_sm_1,pr___ij_sm_1,tran_ij_tas_1, tranij_raw_1,
+                        tasij_raw,id1, id2, yr1)
+          
+          mrso_ijk        = dare1$mrso_ijk    
+          mrro_ijk        = dare1$mrro_ijk    
+          tran_ijk        = dare1$tran_ijk_sm 
+          pr___ijk        = dare1$pr___ijk_sm 
+          tran_ijk_tas_sd = dare1$tran_ijk_tas
+          tran_raw_ijk    = dare1$tranij_raw    
+          tas_raw_ijk     = dare1$tasij_raw 
 
+          tran_raw_ijk_sm0 = rbind(colMeans(tran_raw_ijk[1:3,], na.rm=T),
+                                   colMeans(tran_raw_ijk[2:4,], na.rm=T),
+                                   colMeans(tran_raw_ijk[3:5,], na.rm=T))
+          tran_raw_ijk_sm1 = rbind(tran_raw_ijk[4,],
+                                   tran_raw_ijk[5,],
+                                   tran_raw_ijk[6,])
+          tran_dtr_dsea_ijk_sm0 = rbind(colMeans(tran_ijk_tas_sd[1:3,]),
+                                        colMeans(tran_ijk_tas_sd[2:4,]),
+                                        colMeans(tran_ijk_tas_sd[3:5,]))
+          tran_dtr_dsea_ijk_sm1 = rbind(tran_ijk_tas_sd[4,],
+                                        tran_ijk_tas_sd[5,],
+                                        tran_ijk_tas_sd[6,])
+          
+          smt1 = try(lm(mrso_ijk[4,] ~ colMeans(mrso_ijk[1:3,], na.rm=T) + colMeans(pr___ijk[1:3,], na.rm=T) + colMeans(tran_ijk[1:3,], na.rm=T) + colMeans(mrro_ijk[1:3,], na.rm=T)), silent = T)
+          smt2 = try(lm(mrso_ijk[5,] ~ colMeans(mrso_ijk[2:4,], na.rm=T) + colMeans(pr___ijk[2:4,], na.rm=T) + colMeans(tran_ijk[2:4,], na.rm=T) + colMeans(mrro_ijk[2:4,], na.rm=T)), silent = T)
+          smt3 = try(lm(mrso_ijk[6,] ~ colMeans(mrso_ijk[3:5,], na.rm=T) + colMeans(pr___ijk[3:5,], na.rm=T) + colMeans(tran_ijk[3:5,], na.rm=T) + colMeans(mrro_ijk[3:5,], na.rm=T)), silent = T)
+          
+          if(class(smt1) != "try-error" &
+             class(smt2) != "try-error" &
+             class(smt3) != "try-error"){
+            
+            da_tran_sm[i,j,] = c(coef(smt1)[4], coef(smt2)[4],  coef(smt3)[4])
+            deta_tran_sm     = mean(c(coef(smt1)[4], coef(smt2)[4],  coef(smt3)[4]), na.rm=T)
+            ####sm mean####
+            
+            lai_sm0 = (tran_raw_ijk_sm0*86400*30)*deta_tran_sm
+            lai_sm1 = (tran_raw_ijk_sm1*86400*30)*deta_tran_sm
+            
+            if(ncol(lai_sm0)!=(2100-1850+1)){lai_sm0 = cbind(rep(NA, 3), lai_sm0)}
+            if(ncol(lai_sm1)!=(2100-1850+1)){lai_sm1 = cbind(rep(NA, 3), lai_sm1)}
+            
+            lai_sm_mean0_c[i,j,] = rowMeans(embed(colMeans(lai_sm0), window_yr), na.rm=T)
+            lai_sm_mean1_c[i,j,] = rowMeans(embed(colMeans(lai_sm1), window_yr), na.rm=T)
+            ####sm sd####
+            lai_sm_sd0 = (tran_dtr_dsea_ijk_sm0*86400*30)*deta_tran_sm 
+            lai_sm_sd1 = (tran_dtr_dsea_ijk_sm1*86400*30)*deta_tran_sm 
+            if(ncol(lai_sm_sd0)!=(2100-1850+1)){lai_sm_sd0 = cbind(rep(NA,3), lai_sm_sd0)}
+            if(ncol(lai_sm_sd1)!=(2100-1850+1)){lai_sm_sd1 = cbind(rep(NA,3), lai_sm_sd1)}
+            
+            lai_c_sm_sd0 = c()
+            lai_c_sm_sd1 = c()
+            for (ij in 1:nrow(loca_sel)) {#ij=1
+              lai_c_sm_sd0 = c(lai_c_sm_sd0, sd(lai_sm_sd0[,loca_sel[ij,]], na.rm=T))
+              lai_c_sm_sd1 = c(lai_c_sm_sd1, sd(lai_sm_sd1[,loca_sel[ij,]], na.rm=T))}
+            
+            lai_sm_sd0_c[i,j,] = lai_c_sm_sd0
+            lai_sm_sd1_c[i,j,] = lai_c_sm_sd1
+            ####tas mean####
+            tas_ctr = mean(tas_raw_ijk[4:6,1:window_yr],na.rm=T)
+            f = 1/(4*0.95*5.67*10^-8*tas_ctr^3)
+            if(ncol(tran_raw_ijk)!=(2100-1850+1)){ tran_raw_ijk = cbind(rep(NA,6), tran_raw_ijk) }
+            
+            tran_raw_ijk_yr = tran_raw_ijk[4:6,] 
+            lai_tas = tran_raw_ijk_yr*f*(-2.54*10^6)
+            
+            lai_tas_mean1_c[i,j,] = rowMeans(embed(colMeans(lai_tas), window_yr), na.rm=T)
+            ####tas sd####
+            lai_tas_sd1 = tran_dtr_dsea_ijk_sm1*f*(-2.54*10^6) 
+            if(ncol(lai_tas_sd1)!=(2100-1850+1)){lai_tas_sd1 = cbind(rep(NA,3), lai_tas_sd1)}
+            
+            lai_c_sd1 = c()
+            for (ij in 1:nrow(loca_sel)) {lai_c_sd1 = c(lai_c_sd1, sd(lai_tas_sd1[,loca_sel[ij,]], na.rm=T))  }
+            
+            lai_tas_sd1_c[i,j,] = lai_c_sd1
+            ####cor####
+            lai_c_sm_tas0 = c()
+            lai_c_sm_tas1 = c()
+            for (ijk in 1:nrow(loca_sel)) {#ijk=1
+              lai_c_sm_tas1 = c(lai_c_sm_tas1, cov(na.omit(cbind(matrix(lai_sm_sd1 [,loca_sel[ijk,]], ncol=1), 
+                                                                 matrix(lai_tas_sd1[,loca_sel[ijk,]], ncol=1))))[1,2])
+              lai_c_sm_tas0 = c(lai_c_sm_tas0, cov(na.omit(cbind(matrix(lai_sm_sd0 [,loca_sel[ijk,]], ncol=1), 
+                                                                 matrix(lai_tas_sd1[,loca_sel[ijk,]], ncol=1))))[1,2])}
+            
+            lai_cov_c0[i,j,] = lai_c_sm_tas0
+            lai_cov_c1[i,j,] = lai_c_sm_tas1
+            lai_sm_lai_tas_cor[i,j ] = cor(na.omit(cbind(matrix(lai_sm_sd0 , ncol=1),
+                                                         matrix(lai_tas_sd1, ncol=1))))[1,2]
+            ####tran_change#######
+            
+            if(ncol(tran_dtr_dsea_ijk_sm0)!=251){tran_dtr_dsea_ijk_sm0 = cbind(rep(NA,3), tran_dtr_dsea_ijk_sm0)}
+            if(ncol(tran_dtr_dsea_ijk_sm1)!=251){tran_dtr_dsea_ijk_sm1 = cbind(rep(NA,3), tran_dtr_dsea_ijk_sm1)}
+            tran_dtr_dsea_ijk_sm0 = tran_dtr_dsea_ijk_sm0*86400*30
+            tran_dtr_dsea_ijk_sm1 = tran_dtr_dsea_ijk_sm1*86400*30
+            
+            cov_tran_01_ij = c()
+            for (ijk in 1:nrow(loca_sel)) {#ijk=1
+              cov_tran_01_ij = c(cov_tran_01_ij, 
+                                 cov(na.omit(cbind(matrix(tran_dtr_dsea_ijk_sm0[,loca_sel[ijk,]], ncol=1), 
+                                                   matrix(tran_dtr_dsea_ijk_sm1[,loca_sel[ijk,]], ncol=1))))[1,2])}
+            
+            cov_tran_c01[i,j,] = cov_tran_01_ij
+          }
+        }
+      }
+    }
+    
+    out = list(da_tran_sm           = da_tran_sm        ,
+               tran_tas_mean1_c     = lai_tas_mean1_c   ,
+               tran_tas_sd1_c       = lai_tas_sd1_c     ,
+               tran_sm_mean0_c      = lai_sm_mean0_c    ,
+               tran_sm_mean1_c      = lai_sm_mean1_c    ,
+               tran_sm_sd0_c        = lai_sm_sd0_c      ,
+               tran_sm_sd1_c        = lai_sm_sd1_c      ,
+               tran_cov_c0          = lai_cov_c0        ,
+               tran_cov_c1          = lai_cov_c1        ,
+               cov_tran_c01         = cov_tran_c01      ,
+               tran_sm_tran_tas_cor = lai_sm_lai_tas_cor
+               )
+    return(out)
+  }
+  
+  t1 = proc.time()
+  core=core1
+  cl = makeCluster(core)
+  registerDoParallel(cl)
+  lmf_contribution = foreach (kk = 1:17, .packages=c('forecast','pracma','abind')) %dopar% {#kk=1
+    out_re = get_re_sm_mean_g(fpall, modelna[kk], scenario, window_yr=window_yr)
+    out_re
+  }
+  stopCluster(cl)
+  t2 = proc.time()
+  print((t2 - t1)[3]/60)
+  
+  outna = '3Month_no_ra_sm1_sm0_pr0_tran0_mrro0_ano_3mon_sen_mean_decompose_own_tas_by_sm_first30yr_win_'
+  setwd('/GPUFS/ygo_fwf_1/00junli/01next_step/10results')
+  saveRDS(lmf_contribution[[01]], paste(outna, scenario, '_',modelna[01], window_yr,sep=''))
+  saveRDS(lmf_contribution[[02]], paste(outna, scenario, '_',modelna[02], window_yr,sep=''))
+  saveRDS(lmf_contribution[[03]], paste(outna, scenario, '_',modelna[03], window_yr,sep=''))
+  saveRDS(lmf_contribution[[04]], paste(outna, scenario, '_',modelna[04], window_yr,sep=''))
+  saveRDS(lmf_contribution[[05]], paste(outna, scenario, '_',modelna[05], window_yr,sep=''))
+  saveRDS(lmf_contribution[[06]], paste(outna, scenario, '_',modelna[06], window_yr,sep=''))
+  saveRDS(lmf_contribution[[07]], paste(outna, scenario, '_',modelna[07], window_yr,sep=''))
+  saveRDS(lmf_contribution[[08]], paste(outna, scenario, '_',modelna[08], window_yr,sep=''))
+  saveRDS(lmf_contribution[[09]], paste(outna, scenario, '_',modelna[09], window_yr,sep=''))
+  saveRDS(lmf_contribution[[10]], paste(outna, scenario, '_',modelna[10], window_yr,sep=''))
+  saveRDS(lmf_contribution[[11]], paste(outna, scenario, '_',modelna[11], window_yr,sep=''))
+  saveRDS(lmf_contribution[[12]], paste(outna, scenario, '_',modelna[12], window_yr,sep=''))
+  saveRDS(lmf_contribution[[13]], paste(outna, scenario, '_',modelna[13], window_yr,sep=''))
+  saveRDS(lmf_contribution[[14]], paste(outna, scenario, '_',modelna[14], window_yr,sep=''))
+  saveRDS(lmf_contribution[[15]], paste(outna, scenario, '_',modelna[15], window_yr,sep=''))
+  saveRDS(lmf_contribution[[16]], paste(outna, scenario, '_',modelna[16], window_yr,sep=''))
+  saveRDS(lmf_contribution[[17]], paste(outna, scenario, '_',modelna[17], window_yr,sep=''))
+
+  rm(lmf_contribution)
+  gc()
+}
 #cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)
 #cal_tran_induced_change(fpall, modelna, '_ssp370_', 17, window_yr=30)
 #cal_tran_induced_change(fpall, modelna, '_ssp245_', 17, window_yr=30)
@@ -245,7 +590,329 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
 #cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=20)
 #cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=40)
 
+cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr){
+  
+  get_re_sm_mean_g = function(fpall, modelnai, scenario, window_yr=window_yr){
+    
+    #window_yr=20; modelnai = modelna[01]; scenario='_ssp585_'
+    setwd(fpall)
+    fp_file = list.files(fpall)
+    for (k in 1:length(fp_file)) {#k=10
+      con_tas    = grepl(c('tas'         ), fp_file[k])
+      con_mrso_  = grepl(c('mrso_'       ), fp_file[k])
+      con_mrro_  = grepl(c('mrro_'       ), fp_file[k])
+      con__lai   = grepl(c('lai_L'       ), fp_file[k])
+      con_et     = grepl(c('evspsbl_A'   ), fp_file[k])#
+      con_tran   = grepl(c('tran_L'      ), fp_file[k])#evspsbl_A
+      con_rsds   = grepl(c('rsds'        ), fp_file[k])
+      con_rsus   = grepl(c('rsus'        ), fp_file[k])
+      con_ts     = grepl(c('ts_A'        ), fp_file[k])
+      con_hfss   = grepl(c('hfss_A'      ), fp_file[k])
+      con_wind   = grepl(c('sfcWind_A'   ), fp_file[k])
+      con_pr     = grepl(c('pr_A'        ), fp_file[k])
+      con_his    = grepl(c('_historical_'), fp_file[k])
+      con_ssp585 = grepl(c(scenario      ), fp_file[k])
+      con_modelna= grepl(c(modelnai      ), fp_file[k])
+      
+      if(con_tas   & con_his & con_modelna) {tas__his_bgcna = fp_file[k]}
+      if(con_mrso_ & con_his & con_modelna) {mrso_his_bgcna = fp_file[k]}
+      if(con_mrro_ & con_his & con_modelna) {mrro_his_bgcna = fp_file[k]}
+      if(con__lai  & con_his & con_modelna) {lai__his_bgcna = fp_file[k]}
+      if(con_et    & con_his & con_modelna) {et_his_bgcna   = fp_file[k]}
+      if(con_tran  & con_his & con_modelna) {tranhis_bgcna  = fp_file[k]}
+      if(con_rsds  & con_his & con_modelna) {rsds_his_bgcna = fp_file[k]}
+      if(con_rsus  & con_his & con_modelna) {rsus_his_bgcna = fp_file[k]}
+      if(con_ts    & con_his & con_modelna) {ts_his_bgcna   = fp_file[k]}
+      if(con_hfss  & con_his & con_modelna) {hfss_his_bgcna = fp_file[k]}
+      if(con_wind  & con_his & con_modelna) {wind_his_bgcna = fp_file[k]}
+      if(con_pr    & con_his & con_modelna) {pr_his_bgcna   = fp_file[k]}
+      
+      if(con_tas   & con_ssp585 & con_modelna) {tas__ssp_bgcna = fp_file[k]}
+      if(con_mrso_ & con_ssp585 & con_modelna) {mrso_ssp_bgcna = fp_file[k]}
+      if(con_mrro_ & con_ssp585 & con_modelna) {mrro_ssp_bgcna = fp_file[k]}
+      if(con__lai  & con_ssp585 & con_modelna) {lai__ssp_bgcna = fp_file[k]}
+      if(con_et    & con_ssp585 & con_modelna) {et_ssp_bgcna   = fp_file[k]}
+      if(con_tran  & con_ssp585 & con_modelna) {transsp_bgcna  = fp_file[k]}
+      if(con_rsds  & con_ssp585 & con_modelna) {rsds_ssp_bgcna = fp_file[k]}
+      if(con_rsus  & con_ssp585 & con_modelna) {rsus_ssp_bgcna = fp_file[k]}
+      if(con_ts    & con_ssp585 & con_modelna) {ts_ssp_bgcna   = fp_file[k]}
+      if(con_hfss  & con_ssp585 & con_modelna) {hfss_ssp_bgcna = fp_file[k]}
+      if(con_wind  & con_ssp585 & con_modelna) {wind_ssp_bgcna = fp_file[k]}
+      if(con_pr    & con_ssp585 & con_modelna) {pr_ssp_bgcna   = fp_file[k]}
+    }
+    tas__his = readRDS(tas__his_bgcna)
+    tran_his = readRDS(tranhis_bgcna )
+    mrso_his = readRDS(mrso_his_bgcna)
+    mrro_his = readRDS(mrro_his_bgcna)
+    rsds_his = readRDS(rsds_his_bgcna)
+    pr___his = readRDS(pr_his_bgcna  )
+    rsus_his = readRDS(rsus_his_bgcna)
+    #ts___his = readRDS(ts_his_bgcna  )
+    wind_his = readRDS(wind_his_bgcna)#lai__his = readRDS(lai__his_bgcna)
+    
+    tas__ssp = readRDS(tas__ssp_bgcna)
+    tran_ssp = readRDS(transsp_bgcna )
+    mrso_ssp = readRDS(mrso_ssp_bgcna)
+    mrro_ssp = readRDS(mrro_ssp_bgcna)
+    rsds_ssp = readRDS(rsds_ssp_bgcna)
+    pr___ssp = readRDS(pr_ssp_bgcna  )#lai__ssp = readRDS(lai__ssp_bgcna)
+    rsus_ssp = readRDS(rsus_ssp_bgcna)
+    #ts___ssp = readRDS(ts_ssp_bgcna  )
+    wind_ssp = readRDS(wind_ssp_bgcna)
+    
+    tas__bgc = abind(tas__his, tas__ssp); rm(tas__his); rm(tas__ssp); print(dim(tas__bgc))
+    mrso_bgc = abind(mrso_his, mrso_ssp); rm(mrso_his); rm(mrso_ssp); print(dim(mrso_bgc))
+    mrro_bgc = abind(mrro_his, mrro_ssp); rm(mrro_his); rm(mrro_ssp); print(dim(mrro_bgc))
+    tran_bgc = abind(tran_his, tran_ssp); rm(tran_his); rm(tran_ssp); print(dim(tran_bgc))
+    rsds_bgc = abind(rsds_his, rsds_ssp); rm(rsds_his); rm(rsds_ssp); print(dim(rsds_bgc))
+    pr___bgc = abind(pr___his, pr___ssp); rm(pr___his); rm(pr___ssp); print(dim(pr___bgc))
+    rsus_bgc = abind(rsus_his, rsus_ssp); rm(rsus_his); rm(rsus_ssp); print(dim(rsus_bgc))
+    #ts___bgc = abind(ts___his, ts___ssp); rm(ts___his); rm(ts___ssp); print(dim(ts___bgc))
+    wind_bgc = abind(wind_his, wind_ssp); rm(wind_his); rm(wind_ssp); print(dim(wind_bgc))
+    #lai__bgc = abind(lai__his, lai__ssp); rm(lai__his); rm(lai__ssp); print(dim(lai__bgc))
+    
+    albedo_bgc = rsus_bgc/rsds_bgc
+    albedo_bgc[is.infinite(albedo_bgc)] = NA
+    ra___bgc = 208/wind_bgc
+    #rm(wind_bgc); gc()     #ra___bgc   = 1.2*1013*(ts___bgc - tas__bgc)/hfss_bgc
+    rm(rsus_bgc); gc() 
+    
+    sca=3
+    yr=2100-1850+1
+    len = yr-window_yr+1
+    nrow1=240
+    ncol1=93
+    da_tran_sm         = array(NA, c(nrow1,ncol1,3  ))     
+    lai_tas_mean1_c    = array(NA, c(nrow1,ncol1,len))     
+    lai_tas_sd1_c      = array(NA, c(nrow1,ncol1,len))   
+    lai_sm_mean0_c     = array(NA, c(nrow1,ncol1,len))    
+    lai_sm_mean1_c     = array(NA, c(nrow1,ncol1,len))    
+    lai_sm_sd0_c       = array(NA, c(nrow1,ncol1,len))  
+    lai_sm_sd1_c       = array(NA, c(nrow1,ncol1,len))  
+    lai_cov_c0         = array(NA, c(nrow1,ncol1,len))
+    lai_cov_c1         = array(NA, c(nrow1,ncol1,len))
+    cov_tran_c01       = array(NA, c(nrow1,ncol1,len))
+    lai_sm_lai_tas_cor = matrix(NA, nrow=nrow1, ncol=ncol1)
+    lucc = readRDS('/GPUFS/ygo_fwf_1/00junli/01next_step/lucc2016_1.5degree_vegetated_area.rds');col=1
+    for (i in 1:nrow(tas__bgc)) {
+      for (j in 1:ncol(tas__bgc)) {
+        if(is.na(lucc[i,j]) | is.na(tas__bgc[i,j,1]) | 
+           is.na(mrso_bgc[i,j,1]) | is.na(pr___bgc[i,j,1]) | is.na(tran_bgc[i,j,1])) next
+        #i=200;j=80;image.plot(1:240,1:93,tas__bgc[,,8]);abline(v=i,h=j); gc()
+        tas__ij  = rowMeans(embed(c(tas__bgc[i,j,],rep(NA, sca-1)), sca), na.rm=T)
+        loca_bgc = which.max(rowMeans(matrix(tas__ij, ncol=yr), na.rm=T))
+        locaij = sort(embed(c(1:12,1,2),3)[loca_bgc,])
+        loca_sel = embed(1:yr, window_yr)
+        
+        mrso_ij    = try(decompose_own(ts(mrso_bgc  [i,j,]         , frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        mrro_ij    = try(decompose_own(ts(mrro_bgc  [i,j,]*86400*30, frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        tran_ij_sm = try(decompose_own(ts(tran_bgc  [i,j,]*86400*30, frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        pr___ij_sm = try(decompose_own(ts(pr___bgc  [i,j,]*86400*30, frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        tran_ij_tas= try(decompose_own(ts(tran_bgc  [i,j,]         , frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        albe_ij_tas= try(decompose_own(ts(albedo_bgc[i,j,]         , frequency=12), type = "additive", window_yr = window_yr), silent = T)
+        
+        tranij_raw  = tran_bgc[i,j,]
+        tasij_raw   = tas__bgc[i,j,]
+        sw_ij_raw   = rsds_bgc[i,j,]
+        if(class(mrso_ij    )[1] != "try-error" &
+           class(mrro_ij    )[1] != "try-error" &
+           class(tran_ij_sm )[1] != "try-error" &
+           class(pr___ij_sm )[1] != "try-error" &
+           class(albe_ij_tas)[1] != "try-error" &
+           class(tran_ij_tas)[1] != "try-error"){
+          
+          getre = function(mrso_ij   ,mrro_ij  , tran_ij_sm,pr___ij_sm ,tran_ij_tas,albe_ij_tas, 
+                           tranij_raw,tasij_raw, sw_ij_raw ,albe_ij_raw, id1=09:3008, id2=c(1:6), yr=251){
+            return(list(mrso_ijk     = matrix(mrso_ij    [id1], ncol=yr)[id2,],
+                        mrro_ijk     = matrix(mrro_ij    [id1], ncol=yr)[id2,],
+                        tran_ijk_sm  = matrix(tran_ij_sm [id1], ncol=yr)[id2,],
+                        pr___ijk_sm  = matrix(pr___ij_sm [id1], ncol=yr)[id2,],
+                        tran_ijk_tas = matrix(tran_ij_tas[id1], ncol=yr)[id2,],
+                        albe_ij_tas  = matrix(albe_ij_tas[id1], ncol=yr)[id2,],
+                        tranij_raw   = matrix(tranij_raw [id1], ncol=yr)[id2,],
+                        tasij_raw    = matrix(tasij_raw  [id1], ncol=yr)[id2,],
+                        sw_ij_raw    = matrix(sw_ij_raw  [id1], ncol=yr)[id2,],
+                        albe_ij_raw  = matrix(albe_ij_raw[id1], ncol=yr)[id2,])) }
+          
+          if(loca_bgc==12){
+            id1 = 09:3008; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==11){
+              id1 = 08:3007; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==1){
+                id1 = 10:3009; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==2){
+                  id1 = 11:3010; id2 = c(1:6); yr1 = 2100-1850 }else if(loca_bgc==3){
+                    id1 = 12:3011; id2 = c(1:6); yr1 = 2100-1850 }else{
+                      id1 = 1:3012; id2 = c((min(locaij)-3):max(locaij)); yr1 = 2100-1850+1
+                    }
+          
+          mrso_ij_1     = mrso_ij    $random
+          mrro_ij_1     = mrro_ij    $random
+          tran_ij_sm_1  = tran_ij_sm $random
+          pr___ij_sm_1  = pr___ij_sm $random
+          tran_ij_tas_1 = tran_ij_tas$random
+          albe_ij_tas_1 = albe_ij_tas$random
+          tranij_raw_1  = tran_ij_tas$trend
+          albe_ij_raw   = albe_ij_tas$trend
+          
+          dare1 = getre(mrso_ij_1   ,mrro_ij_1,tran_ij_sm_1,pr___ij_sm_1,tran_ij_tas_1, albe_ij_tas_1,
+                        tranij_raw_1,tasij_raw, sw_ij_raw  ,albe_ij_raw , id1, id2, yr1)
+          
+          mrso_ijk        = dare1$mrso_ijk    
+          mrro_ijk        = dare1$mrro_ijk    
+          tran_ijk        = dare1$tran_ijk_sm 
+          pr___ijk        = dare1$pr___ijk_sm 
+          tran_ijk_tas_sd = dare1$tran_ijk_tas
+          albe_ijk_tas_sd = dare1$albe_ij_tas
+          tran_raw_ijk    = dare1$tranij_raw    
+          tas_raw_ijk     = dare1$tasij_raw 
+          sw__raw_ijk     = dare1$sw_ij_raw 
+          albe_ij_raw     = dare1$albe_ij_raw 
+          
+          tran_raw_ijk_sm0 = rbind(colMeans(tran_raw_ijk[1:3,], na.rm=T),
+                                   colMeans(tran_raw_ijk[2:4,], na.rm=T),
+                                   colMeans(tran_raw_ijk[3:5,], na.rm=T))
+          tran_raw_ijk_sm1 = rbind(tran_raw_ijk[4,],
+                                   tran_raw_ijk[5,],
+                                   tran_raw_ijk[6,])
+          tran_dtr_dsea_ijk_sm0 = rbind(colMeans(tran_ijk_tas_sd[1:3,]),
+                                        colMeans(tran_ijk_tas_sd[2:4,]),
+                                        colMeans(tran_ijk_tas_sd[3:5,]))
+          tran_dtr_dsea_ijk_sm1 = rbind(tran_ijk_tas_sd[4,],
+                                        tran_ijk_tas_sd[5,],
+                                        tran_ijk_tas_sd[6,])
+          
+          smt1 = try(lm(mrso_ijk[4,] ~ colMeans(mrso_ijk[1:3,], na.rm=T) + colMeans(pr___ijk[1:3,], na.rm=T) + colMeans(tran_ijk[1:3,], na.rm=T) + colMeans(mrro_ijk[1:3,], na.rm=T)), silent = T)
+          smt2 = try(lm(mrso_ijk[5,] ~ colMeans(mrso_ijk[2:4,], na.rm=T) + colMeans(pr___ijk[2:4,], na.rm=T) + colMeans(tran_ijk[2:4,], na.rm=T) + colMeans(mrro_ijk[2:4,], na.rm=T)), silent = T)
+          smt3 = try(lm(mrso_ijk[6,] ~ colMeans(mrso_ijk[3:5,], na.rm=T) + colMeans(pr___ijk[3:5,], na.rm=T) + colMeans(tran_ijk[3:5,], na.rm=T) + colMeans(mrro_ijk[3:5,], na.rm=T)), silent = T)
+          
+          if(class(smt1) != "try-error" &
+             class(smt2) != "try-error" &
+             class(smt3) != "try-error"){
+            
+            #da_tran_sm[i,j,] = c(coef(smt1)[4], coef(smt2)[4],  coef(smt3)[4])
+            deta_tran_sm = mean(c(coef(smt1)[4], coef(smt2)[4],  coef(smt3)[4]), na.rm=T)
+            ####sm mean####
+            
+            #lai_sm0 = (tran_raw_ijk_sm0*86400*30)*deta_tran_sm
+            #lai_sm1 = (tran_raw_ijk_sm1*86400*30)*deta_tran_sm
+            #
+            #if(ncol(lai_sm0)!=(2100-1850+1)){lai_sm0 = cbind(rep(NA, 3), lai_sm0)}
+            #if(ncol(lai_sm1)!=(2100-1850+1)){lai_sm1 = cbind(rep(NA, 3), lai_sm1)}
+            #
+            #lai_sm_mean0_c[i,j,] = rowMeans(embed(colMeans(lai_sm0), window_yr), na.rm=T)
+            #lai_sm_mean1_c[i,j,] = rowMeans(embed(colMeans(lai_sm1), window_yr), na.rm=T)
+            ####sm sd####
+            lai_sm_sd0 = (tran_dtr_dsea_ijk_sm0*86400*30)*deta_tran_sm 
+            lai_sm_sd1 = (tran_dtr_dsea_ijk_sm1*86400*30)*deta_tran_sm 
+            if(ncol(lai_sm_sd0)!=(2100-1850+1)){lai_sm_sd0 = cbind(rep(NA,3), lai_sm_sd0)}
+            if(ncol(lai_sm_sd1)!=(2100-1850+1)){lai_sm_sd1 = cbind(rep(NA,3), lai_sm_sd1)}
+            
+            lai_c_sm_sd0 = c()
+            lai_c_sm_sd1 = c()
+            for (ij in 1:nrow(loca_sel)) {#ij=1
+              lai_c_sm_sd0 = c(lai_c_sm_sd0, sd(lai_sm_sd0[,loca_sel[ij,]], na.rm=T))
+              lai_c_sm_sd1 = c(lai_c_sm_sd1, sd(lai_sm_sd1[,loca_sel[ij,]], na.rm=T))}
+            
+            lai_sm_sd0_c[i,j,] = lai_c_sm_sd0
+            lai_sm_sd1_c[i,j,] = lai_c_sm_sd1
+            ####tas mean####
+            rsdsctr = mean(sw__raw_ijk[4:6,1:window_yr],na.rm=T)
+            tas_ctr = mean(tas_raw_ijk[4:6,1:window_yr],na.rm=T)
+            
+            f = 1/(4*0.95*5.67*10^-8*tas_ctr^3)
+            if(ncol(albe_ij_raw)!=(2100-1850+1)){ albe_ij_raw = cbind(rep(NA,6), albe_ij_raw) }
+            
+            lai_tas = albe_ij_raw[4:6,]*f*(-rsdsctr)
+            
+            lai_tas_mean1_c[i,j,] = rowMeans(embed(colMeans(lai_tas), window_yr), na.rm=T)
+            ####tas sd####
+            albe_dtr_dsea_ijk_sm1 = rbind(albe_ijk_tas_sd[4,],
+                                          albe_ijk_tas_sd[5,],
+                                          albe_ijk_tas_sd[6,])#albe_ijk_tas_sd
+            
+            lai_tas_sd1 = albe_dtr_dsea_ijk_sm1*f*(-rsdsctr)
+            if(ncol(lai_tas_sd1)!=(2100-1850+1)){lai_tas_sd1 = cbind(rep(NA,3), lai_tas_sd1)}
+            
+            lai_c_sd1 = c()
+            for (ij in 1:nrow(loca_sel)) {lai_c_sd1 = c(lai_c_sd1, sd(lai_tas_sd1[,loca_sel[ij,]], na.rm=T))  }
+            
+            lai_tas_sd1_c[i,j,] = lai_c_sd1
+            ####cor####
+            lai_c_sm_tas0 = c()
+            lai_c_sm_tas1 = c()
+            for (ijk in 1:nrow(loca_sel)) {#ijk=1
+              lai_c_sm_tas1 = c(lai_c_sm_tas1, cov(na.omit(cbind(matrix(lai_sm_sd1 [,loca_sel[1,]], ncol=1), 
+                                                                 matrix(lai_tas_sd1[,loca_sel[ijk,]], ncol=1))))[1,2])
+              lai_c_sm_tas0 = c(lai_c_sm_tas0, cov(na.omit(cbind(matrix(lai_sm_sd0 [,loca_sel[1,]], ncol=1), 
+                                                                 matrix(lai_tas_sd1[,loca_sel[ijk,]], ncol=1))))[1,2])}
+            
+            lai_cov_c0[i,j,] = lai_c_sm_tas0
+            lai_cov_c1[i,j,] = lai_c_sm_tas1
+            ##
+            ####tran_change#######
+            
+            #if(ncol(tran_dtr_dsea_ijk_sm0)!=251){tran_dtr_dsea_ijk_sm0 = cbind(rep(NA,3), tran_dtr_dsea_ijk_sm0)}
+            #if(ncol(tran_dtr_dsea_ijk_sm1)!=251){tran_dtr_dsea_ijk_sm1 = cbind(rep(NA,3), tran_dtr_dsea_ijk_sm1)}
+            #tran_dtr_dsea_ijk_sm0 = tran_dtr_dsea_ijk_sm0*86400*30
+            #tran_dtr_dsea_ijk_sm1 = tran_dtr_dsea_ijk_sm1*86400*30
+            #
+            #cov_tran_01_ij = c()
+            #for (ijk in 1:nrow(loca_sel)) {#ijk=1
+            #  cov_tran_01_ij = c(cov_tran_01_ij, 
+            #                     cov(na.omit(cbind(matrix(tran_dtr_dsea_ijk_sm0[,loca_sel[ijk,]], ncol=1), 
+            #                                       matrix(tran_dtr_dsea_ijk_sm1[,loca_sel[ijk,]], ncol=1))))[1,2])}
+            #
+            #cov_tran_c01[i,j,] = cov_tran_01_ij
+            #col=col+1; print(col)
+          }
+        }
+      }
+    }
+    
+    out = list(alb_tas_mean1_c = lai_tas_mean1_c,
+               alb_tas_sd1_c   = lai_tas_sd1_c  ,
+               alb_sm_mean0_c  = lai_sm_mean0_c ,
+               alb_sm_mean1_c  = lai_sm_mean1_c ,
+               alb_sm_sd0_c    = lai_sm_sd0_c   ,
+               alb_sm_sd1_c    = lai_sm_sd1_c   ,
+               alb_cov_c0      = lai_cov_c0     ,
+               alb_cov_c1      = lai_cov_c1     )
+    return(out)
+  }
+  
+  t1 = proc.time()
+  core=core1
+  cl = makeCluster(core)
+  registerDoParallel(cl)
+  lmf_contribution = foreach (kk = 1:17, .packages=c('forecast','pracma','abind')) %dopar% {#kk=1
+    out_re = get_re_sm_mean_g(fpall, modelna[kk], scenario, window_yr=window_yr)
+    out_re
+  }
+  stopCluster(cl)
+  t2 = proc.time()
+  print((t2 - t1)[3]/60)
+  
+  outna = 'Albedo_induce_change_3mon_'
+  setwd('/GPUFS/ygo_fwf_1/00junli/01next_step/10results_Albedo_induce_change')
+  saveRDS(lmf_contribution[[01]], paste(outna, scenario, '_',modelna[01], window_yr,sep=''))
+  saveRDS(lmf_contribution[[02]], paste(outna, scenario, '_',modelna[02], window_yr,sep=''))
+  saveRDS(lmf_contribution[[03]], paste(outna, scenario, '_',modelna[03], window_yr,sep=''))
+  saveRDS(lmf_contribution[[04]], paste(outna, scenario, '_',modelna[04], window_yr,sep=''))
+  saveRDS(lmf_contribution[[05]], paste(outna, scenario, '_',modelna[05], window_yr,sep=''))
+  saveRDS(lmf_contribution[[06]], paste(outna, scenario, '_',modelna[06], window_yr,sep=''))
+  saveRDS(lmf_contribution[[07]], paste(outna, scenario, '_',modelna[07], window_yr,sep=''))
+  saveRDS(lmf_contribution[[08]], paste(outna, scenario, '_',modelna[08], window_yr,sep=''))
+  saveRDS(lmf_contribution[[09]], paste(outna, scenario, '_',modelna[09], window_yr,sep=''))
+  saveRDS(lmf_contribution[[10]], paste(outna, scenario, '_',modelna[10], window_yr,sep=''))
+  saveRDS(lmf_contribution[[11]], paste(outna, scenario, '_',modelna[11], window_yr,sep=''))
+  saveRDS(lmf_contribution[[12]], paste(outna, scenario, '_',modelna[12], window_yr,sep=''))
+  saveRDS(lmf_contribution[[13]], paste(outna, scenario, '_',modelna[13], window_yr,sep=''))
+  saveRDS(lmf_contribution[[14]], paste(outna, scenario, '_',modelna[14], window_yr,sep=''))
+  saveRDS(lmf_contribution[[15]], paste(outna, scenario, '_',modelna[15], window_yr,sep=''))
+  saveRDS(lmf_contribution[[16]], paste(outna, scenario, '_',modelna[16], window_yr,sep=''))
+  saveRDS(lmf_contribution[[17]], paste(outna, scenario, '_',modelna[17], window_yr,sep=''))
 
+  rm(lmf_contribution)
+  gc()
+}
 #cal_albedo_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)
 #cal_albedo_induced_change(fpall, modelna, '_ssp370_', 17, window_yr=30)
 #cal_albedo_induced_change(fpall, modelna, '_ssp245_', 17, window_yr=30)
