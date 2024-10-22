@@ -9,11 +9,19 @@ require(pls)
 require(segmented)
 require(abind)
 
-##
+#Inside the function is encompassed by a number of small functions, 
+#based on the input variables can be directly calculated the required results
 ###################lmf calculation###############################
 
+#This function is used for LMF calculation and  decomposition.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimension array.
+#'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
+#'modelnai' is the model names used to load the CMIP6 data.
+#'threshold' is used to defined compound dry-hot events, such as 0.9.
+#'window_yr' is moving window used for calculating compound events. 
+#'get_lmf_all' function contains a small function, in which 'i' and 'j' is grid location, and share the 
+#the same parameter as 'get_lmf_all' function
 
-fpall = '/GPUFS/ygo_fwf_1/00junli/01next_step/GCM_all_data_his_126_245_370_585/all_gcm_da'
 get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, window_yr=40){
   t1 = proc.time()
   get_lmf_ij_sd = function(tas__bgc, mrso_bgc, i, j, threshold = 0.9, window_yr=30){#i=200;j=80
@@ -143,8 +151,6 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
     return(out_da)
   }
   
-  lucc = readRDS('/GPUFS/ygo_fwf_1/00junli/01next_step/lucc2016_1.5degree_vegetated_area.rds')
-  #fphis=fpall; modelnai=modelna[01]; window_yr=30;scenario='_ssp585_';threshold = 0.9
   setwd(fpall)
   fp_file = list.files(fpall)
   for (k in 1:length(fp_file)) {#k=10
@@ -165,11 +171,6 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
   tas__ssp = readRDS(tas__ssp_bgcna)
   mrso_ssp = readRDS(mrso_ssp_bgcna)
   
-  #if(modelnai == "TaiESM1" & dim(tas__his)[3] != 1980){ tas__his = abind(matrix(NA, nrow=240, ncol=93), tas__his)}
-  #if(modelnai == "TaiESM1" & dim(mrso_his)[3] != 1980){ mrso_his = abind(matrix(NA, nrow=240, ncol=93), mrso_his)}
-  #if(modelnai == "TaiESM1" & dim(tas__ssp)[3] != 1032){ tas__ssp = abind(matrix(NA, nrow=240, ncol=93), tas__ssp)}
-  #if(modelnai == "TaiESM1" & dim(mrso_ssp)[3] != 1032){ mrso_ssp = abind(matrix(NA, nrow=240, ncol=93), mrso_ssp)}
-  
   tas__bgc = abind(tas__his, tas__ssp); rm(tas__his); rm(tas__ssp)
   mrso_bgc = abind(mrso_his, mrso_ssp); rm(mrso_his); rm(mrso_ssp)
   gc()
@@ -182,7 +183,7 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
   cl = makeCluster(core)
   registerDoParallel(cl)
   lmf_bgc1 = foreach (k1 = 1:dim(tas__bgc)[1], .packages=c('VineCopula','lmom','pracma','abind'))  %:% 
-    foreach (k2 = 1:dim(tas__bgc)[2],.combine='rbind') %dopar% {  #k1=50;k2=80; 
+    foreach (k2 = 1:dim(tas__bgc)[2],.combine='rbind') %dopar% {  # 
       if(is.na(lucc[k1,k2])         |
          is.na(tas__bgc[k1,k2,100]) | 
          is.na(mrso_bgc[k1,k2,100])){
@@ -193,17 +194,7 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
       out_i
     }
   stopCluster(cl)
-  
-  #plot(out_i[((len - 1)*(06-1)+1):((len - 1)*06)], out_i[((len - 1)*(1-1)+1):((len - 1)*1)])
-  #plot(out_i[((len - 1)*(07-1)+1):((len - 1)*07)], out_i[((len - 1)*(2-1)+1):((len - 1)*2)])
-  #plot(out_i[((len - 1)*(08-1)+1):((len - 1)*08)], out_i[((len - 1)*(3-1)+1):((len - 1)*3)])
-  #plot(out_i[((len - 1)*(09-1)+1):((len - 1)*09)], out_i[((len - 1)*(4-1)+1):((len - 1)*4)])
-  #plot(out_i[((len - 1)*(1-1)+1):((len - 1)*1)]+
-  #     out_i[((len - 1)*(2-1)+1):((len - 1)*2)]+
-  #     out_i[((len - 1)*(3-1)+1):((len - 1)*3)]+
-  #     out_i[((len - 1)*(4-1)+1):((len - 1)*4)],
-  #     out_i[((len - 1)*(5-1)+1):((len - 1)*5)])
-  
+
   lmf_bgc_timing = array(NA, c(dim(tas__bgc)[1], dim(tas__bgc)[2], da_len))
   for (k3 in 1:length(lmf_bgc1)) {#k3=1
     lmf_bgc_timing[k3,,] = lmf_bgc1[[k3]]
@@ -212,32 +203,16 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
   out_na = 'lmf-sm-ta-mean-sm-ta-var-sm-ta-dep-total_'
   setwd('/GPUFS/ygo_fwf_1/00junli/01next_step/7lmf_all_and_ensemble')
   saveRDS(lmf_bgc_timing, file = paste(out_na, scenario, modelnai, '_', threshold, '_', window_yr, sep=''))
-} #contain raw values
+} 
 
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp126_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp245_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp370_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
 #
-#
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.90, 20);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.90, 40);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.95, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.80, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-#for (kk in 1:17) {
-#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.85, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
-
 ###################tran-induced change##########################################################
-
-decompose_own = function(x, type = c("additive", "multiplicative"), filter = NULL, window_yr){
+#'decompose_own'  is used to detrend and deseasonalize, 
+#in which x is time series from CMIP6 data; window_yr' is moving window. 
+decompose_own = function(x, type = "additive", window_yr){
+  #We eliminated the mean seasonality from the first 30-year period, along with the long-term trends.
+  
+  filter = NULL
   #x = x_mrso_ij
   type <- match.arg(type)
   
@@ -270,6 +245,18 @@ decompose_own = function(x, type = c("additive", "multiplicative"), filter = NUL
                  random = if (type == "additive") x - seasonal - trend else x/seasonal/trend, 
                  figure = figure, type = type), class = "decomposed.ts")
 }
+
+#'al_tran_induced_change' and 'cal_albedo_induced_change' is used to calculate Tran-induced or albedo-induced changes.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimension array.
+#'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
+#'modelna' is the model names used to load the CMIP6 data.
+#'core1' is used to define the core for parallel.
+#'window_yr' is moving window used for calculating compound events. 
+#'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', 
+#in which share the same parameters, and this function is used for obtain tran-induced changes based on water and energy balance equations.
+#'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', 
+#in which share the same parameters, and this function is used for obtain albedo-induced changes based on water and energy balance equations.
+
 cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
   
@@ -533,7 +520,7 @@ cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
       }
     }
     
-    out = list(da_tran_sm           = da_tran_sm        ,
+    out = list(da_tran_sm           = da_tran_sm        ,#
                tran_tas_mean1_c     = lai_tas_mean1_c   ,
                tran_tas_sd1_c       = lai_tas_sd1_c     ,
                tran_sm_mean0_c      = lai_sm_mean0_c    ,
@@ -583,16 +570,9 @@ cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   rm(lmf_contribution)
   gc()
 }
-#cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)
-#cal_tran_induced_change(fpall, modelna, '_ssp370_', 17, window_yr=30)
-#cal_tran_induced_change(fpall, modelna, '_ssp245_', 17, window_yr=30)
-#cal_tran_induced_change(fpall, modelna, '_ssp126_', 17, window_yr=30)
-#cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=20)
-#cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=40)
-
 cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
-  get_re_sm_mean_g = function(fpall, modelnai, scenario, window_yr=window_yr){
+  get_re_sm_alb_g = function(fpall, modelnai, scenario, window_yr=window_yr){
     
     #window_yr=20; modelnai = modelna[01]; scenario='_ssp585_'
     setwd(fpall)
@@ -883,7 +863,7 @@ cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr)
   cl = makeCluster(core)
   registerDoParallel(cl)
   lmf_contribution = foreach (kk = 1:17, .packages=c('forecast','pracma','abind')) %dopar% {#kk=1
-    out_re = get_re_sm_mean_g(fpall, modelna[kk], scenario, window_yr=window_yr)
+    out_re = get_re_sm_alb_g(fpall, modelna[kk], scenario, window_yr=window_yr)
     out_re
   }
   stopCluster(cl)
@@ -913,16 +893,21 @@ cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr)
   rm(lmf_contribution)
   gc()
 }
-#cal_albedo_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)
-#cal_albedo_induced_change(fpall, modelna, '_ssp370_', 17, window_yr=30)
-#cal_albedo_induced_change(fpall, modelna, '_ssp245_', 17, window_yr=30)
-#cal_albedo_induced_change(fpall, modelna, '_ssp126_', 17, window_yr=30)
-#cal_albedo_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=20)
-#cal_albedo_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=40)
 
+##
 ###################lmf Prediction####################################################
+#This function is used to LMF prediction related to vegetation greening. 
+#'rena' is the data output from 'get_lmf_all' function, in which data have each individual LMFs and the associated changes.
+#'lai_gs_indc' is the data of Tran-induced or albedo-induced changes from the above two functions.
+#Tran-induced or albedo-induced changes.
+#'threshold' is used to defined compound dry-hot events, such as 0.9.
+#'window_yr' is moving window used for calculating compound events. 
+#'out_na' is output file name.
+#There are two small function, i.e., 'get_da' and 'cal_re'.
+#'get_da' is used for LMF prediction at each grid cell. The associated inputs are from 'cal_re' function. Few fitting equations yield intercepts marginally exceeding or falling zero, and the Tran-induced changes are comparatively modest, we opt to deduct the prediction model intercept to avoid the potential underestimation or overestimation in predictions. 
+#'cal_re' generally have the same input variables as 'lmf_pre1'.
 
-lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=50, out_na){
+lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=30, out_na){
   t1 = proc.time()
   get_da = function(lai_gs_ind,lmf_sm_mean ,lmf_ta_mean ,lmf_sm_ta_sd,lmf_dep,
                     lmf_total ,sm_mean_c   ,ta_mean_c   ,sm_ta_sdc   ,cor_c  ,i,j, id=len, da_len=7*len){#i=70;j=78
@@ -1081,48 +1066,8 @@ lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=50, out
   print((t2 - t1)[3]/60)
 }
 
-#out_na = 'lmf-sm-ta-mean-sm-ta-var-sm-ta-dep-total_'
-#threshold = 0.9
-#window_yr = 30
-#scenario= '_ssp585_'; rena585_0.90_30 = c(paste(out_na, scenario, modelna[01], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[02], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[03], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[04], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[05], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[06], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[07], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[08], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[09], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[10], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[11], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[12], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[13], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[14], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[15], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[16], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[17], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[18], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[19], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[20], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[21], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[22], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[23], '_', threshold, '_', window_yr, sep=''))
-#scenario= '_ssp370_'; rena370_0.90_30 = c(paste(out_na, scenario, modelna[01], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[02], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[03], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[04], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[05], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[06], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[07], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[08], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[09], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[10], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[11], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[12], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[13], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[14], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[15], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[16], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[17], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[18], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[19], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[20], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[21], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[22], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[23], '_', threshold, '_', window_yr, sep=''))
-#scenario= '_ssp245_'; rena245_0.90_30 = c(paste(out_na, scenario, modelna[01], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[02], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[03], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[04], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[05], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[06], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[07], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[08], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[09], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[10], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[11], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[12], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[13], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[14], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[15], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[16], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[17], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[18], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[19], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[20], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[21], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[22], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[23], '_', threshold, '_', window_yr, sep=''))
-#scenario= '_ssp126_'; rena126_0.90_30 = c(paste(out_na, scenario, modelna[01], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[02], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[03], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[04], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[05], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[06], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[07], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[08], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[09], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[10], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[11], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[12], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[13], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[14], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[15], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[16], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[17], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[18], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[19], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[20], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[21], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[22], '_', threshold, '_', window_yr, sep=''),paste(out_na, scenario, modelna[23], '_', threshold, '_', window_yr, sep=''))
-#
-#scenario= '_ssp585_'; 
-#rena585_0.95_30 = c(paste(out_na, scenario, modelna[01], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[02], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[03], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[04], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[05], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[06], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[07], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[08], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[09], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[10], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[11], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[12], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[13], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[14], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[15], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[16], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[17], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[18], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[19], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[20], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[21], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[22], '_', 0.95, '_', 30, sep=''),paste(out_na, scenario, modelna[23], '_', 0.95, '_', 30, sep=''))
-#rena585_0.80_30 = c(paste(out_na, scenario, modelna[01], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[02], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[03], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[04], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[05], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[06], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[07], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[08], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[09], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[10], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[11], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[12], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[13], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[14], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[15], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[16], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[17], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[18], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[19], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[20], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[21], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[22], '_', 0.80, '_', 30, sep=''),paste(out_na, scenario, modelna[23], '_', 0.80, '_', 30, sep=''))
-#rena585_0.85_30 = c(paste(out_na, scenario, modelna[01], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[02], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[03], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[04], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[05], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[06], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[07], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[08], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[09], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[10], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[11], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[12], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[13], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[14], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[15], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[16], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[17], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[18], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[19], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[20], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[21], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[22], '_', 0.85, '_', 30, sep=''),paste(out_na, scenario, modelna[23], '_', 0.85, '_', 30, sep=''))
-#rena585_0.90_20 = c(paste(out_na, scenario, modelna[01], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[02], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[03], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[04], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[05], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[06], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[07], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[08], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[09], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[10], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[11], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[12], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[13], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[14], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[15], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[16], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[17], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[18], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[19], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[20], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[21], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[22], '_', 0.90, '_', 20, sep=''),paste(out_na, scenario, modelna[23], '_', 0.90, '_', 20, sep=''))
-#rena585_0.90_40 = c(paste(out_na, scenario, modelna[01], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[02], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[03], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[04], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[05], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[06], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[07], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[08], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[09], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[10], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[11], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[12], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[13], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[14], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[15], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[16], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[17], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[18], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[19], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[20], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[21], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[22], '_', 0.90, '_', 40, sep=''),paste(out_na, scenario, modelna[23], '_', 0.90, '_', 40, sep=''))
-#
-#outna = '3Month_no_ra_sm1_sm0_pr0_tran0_mrro0_ano_3mon_sen_mean_decompose_own_tas_by_sm_first30yr_win_'
-#window_yr = 30
-#scenario ='_ssp585_'; tran_indc585_30yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-#scenario ='_ssp370_'; tran_indc370_30yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-#scenario ='_ssp245_'; tran_indc245_30yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-#scenario ='_ssp126_'; tran_indc126_30yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-#
-#window_yr = 20
-#scenario ='_ssp585_'; tran_indc585_20yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-#window_yr = 40
-#scenario ='_ssp585_'; tran_indc585_40yr = c(paste(outna, scenario, '_',modelna[01], window_yr,sep=''),paste(outna, scenario, '_',modelna[02], window_yr,sep=''),paste(outna, scenario, '_',modelna[03], window_yr,sep=''),paste(outna, scenario, '_',modelna[04], window_yr,sep=''),paste(outna, scenario, '_',modelna[05], window_yr,sep=''),paste(outna, scenario, '_',modelna[06], window_yr,sep=''),paste(outna, scenario, '_',modelna[07], window_yr,sep=''),paste(outna, scenario, '_',modelna[08], window_yr,sep=''),paste(outna, scenario, '_',modelna[09], window_yr,sep=''),paste(outna, scenario, '_',modelna[10], window_yr,sep=''),paste(outna, scenario, '_',modelna[11], window_yr,sep=''),paste(outna, scenario, '_',modelna[12], window_yr,sep=''),paste(outna, scenario, '_',modelna[13], window_yr,sep=''),paste(outna, scenario, '_',modelna[14], window_yr,sep=''),paste(outna, scenario, '_',modelna[15], window_yr,sep=''),paste(outna, scenario, '_',modelna[16], window_yr,sep=''),paste(outna, scenario, '_',modelna[17], window_yr,sep=''),paste(outna, scenario, '_',modelna[18], window_yr,sep=''),paste(outna, scenario, '_',modelna[19], window_yr,sep=''),paste(outna, scenario, '_',modelna[20], window_yr,sep=''),paste(outna, scenario, '_',modelna[21], window_yr,sep=''),paste(outna, scenario, '_',modelna[22], window_yr,sep=''),paste(outna, scenario, '_',modelna[23], window_yr,sep=''))
-
-#lmf_pre1(rena585_0.90_30, tran_indc585_30yr, modelna, threshold=0.90, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-#lmf_pre1(rena370_0.90_30, tran_indc370_30yr, modelna, threshold=0.90, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp370_')
-#lmf_pre1(rena245_0.90_30, tran_indc245_30yr, modelna, threshold=0.90, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp245_')
-#lmf_pre1(rena126_0.90_30, tran_indc126_30yr, modelna, threshold=0.90, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp126_')
-#
-#lmf_pre1(rena585_0.90_20, tran_indc585_20yr, modelna, threshold=0.90, window_yr=20, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-#lmf_pre1(rena585_0.90_40, tran_indc585_40yr, modelna, threshold=0.90, window_yr=40, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-#
-#lmf_pre1(rena585_0.95_30, tran_indc585_30yr, modelna, threshold=0.95, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-#lmf_pre1(rena585_0.80_30, tran_indc585_30yr, modelna, threshold=0.80, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-#lmf_pre1(rena585_0.85_30, tran_indc585_30yr, modelna, threshold=0.85, window_yr=30, 'Pre_sm_ta_sd_together_no_ra_sen_mean_each_mon_ssp585_')
-
 ##
 ###################Tran alb variability and cov ############################
-
 
 #Tran_ano_plsr('_ssp585_', window_yr=30, 23)
 #Tran_ano_plsr('_ssp370_', window_yr=30, 23)
@@ -1130,8 +1075,4 @@ lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=50, out
 #Tran_ano_plsr('_ssp126_', window_yr=30, 23)
 
 
-##
-###################Tran alb variability and cov 3 co2 sensitive######################
-
-#tran_ano(10)
 
