@@ -19,7 +19,7 @@ require(abind)
 #'modelnai' is the model names used to load the CMIP6 data.
 #'threshold' is used to defined compound dry-hot events, such as 0.9.
 #'window_yr' is moving window used for calculating compound events. 
-#'get_lmf_all' function contains a small function, in which 'i' and 'j' is grid location, and share the 
+#'get_lmf_all' function contains a small function, i.e., 'get_lmf_ij_sd' is used for LMF calculation and decomposition at each grid, in which 'i' and 'j' are grid locations, and share the 
 #the same parameter as 'get_lmf_all' function
 
 get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, window_yr=40){
