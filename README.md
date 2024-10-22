@@ -1,4 +1,4 @@
-This file includes functions for LMF calculation and decomposition, temperature and soil moisture changes driven by Ec and Albedo, as well as the associated LMF simulation.
+This file includes functions for LMF calculation and decomposition, temperature and soil moisture changes driven by Ec and Albedo, as well as the associated LMF simulation. We  provided detailed execution instructions for each function, specifying the required input variables and expected outputs in 'main_function.r' files.
 
 Note:
 1. System requirements: 
