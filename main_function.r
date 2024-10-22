@@ -9,16 +9,16 @@ require(pls)
 require(segmented)
 require(abind)
 
-#Inside the function is encompassed by a number of small functions, 
+#The big function is encompassed by several small functions, 
 #based on the input variables can be directly calculated the required results
 ###################lmf calculation###############################
 
 #This function is used for LMF calculation and  decomposition.
-#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimension array.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data is a 3-dimensional array during historical (1850-2014) and future (2015-2100) periods for each model.
 #'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
-#'modelnai' is the model names used to load the CMIP6 data.
-#'threshold' is used to defined compound dry-hot events, such as 0.9.
-#'window_yr' is moving window used for calculating compound events. 
+#'modelnai' is the model name used to load the CMIP6 data.
+#'threshold' is used to define compound dry-hot events, such as 0.9.
+#'window_yr' is a moving window used for calculating compound events. 
 #'get_lmf_all' function contains a small function, i.e., 'get_lmf_ij_sd' is used for LMF calculation and decomposition at each grid, in which 'i' and 'j' are grid locations, and share the 
 #the same parameter as 'get_lmf_all' function
 
@@ -246,16 +246,16 @@ decompose_own = function(x, type = "additive", window_yr){
                  figure = figure, type = type), class = "decomposed.ts")
 }
 
-#'al_tran_induced_change' and 'cal_albedo_induced_change' is used to calculate Tran-induced or albedo-induced changes.
-#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimension array.
+#'al_tran_induced_change' and 'cal_albedo_induced_change' are used to calculate Tran-induced or albedo-induced changes.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimensional array.
 #'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
-#'modelna' is the model names used to load the CMIP6 data.
+#'modelna' is the model name used to load the CMIP6 data.
 #'core1' is used to define the core for parallel.
-#'window_yr' is moving window used for calculating compound events. 
+#'window_yr' is a moving window used for calculating compound events. 
 #'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', 
-#in which share the same parameters, and this function is used for obtain tran-induced changes based on water and energy balance equations.
+#in which share the same parameters, and this function is used to obtain tran-induced changes based on water and energy balance equations.
 #'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', 
-#in which share the same parameters, and this function is used for obtain albedo-induced changes based on water and energy balance equations.
+#in which share the same parameters, and this function is used to obtain albedo-induced changes based on water and energy balance equations.
 
 cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
