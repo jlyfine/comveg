@@ -204,7 +204,7 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
 } 
 
 #This is an example.
-#for (kk in 1:23) {
+#for (kk in 1:17) {
 #  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
 
 #
@@ -257,7 +257,7 @@ decompose_own = function(x, window_yr){
 #'window_yr' is a moving window used for calculating compound events. 
 #'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', sharing the same parameters; This function is used to obtain Tran-induced changes for each CMIP6 model based on water and energy balance equations.
 #'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', sharing the same parameters; This function is used to obtain albedo-induced changes for each CMIP6 model based on water and energy balance equations.
-#Please see our paper to get the detained information on water and energy balance equation. 
+#Please see our paper to get detailed information on the water and energy balance equation. 
                  
 cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
