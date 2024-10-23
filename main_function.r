@@ -204,6 +204,10 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
   saveRDS(lmf_bgc_timing, file = paste(out_na, scenario, modelnai, '_', threshold, '_', window_yr, sep=''))
 } 
 
+#This is an example.
+#for (kk in 1:23) {
+#  tryCatch({get_lmf_all(fpall, '_ssp585_', modelna[kk], 0.90, 30);print(kk)}, error=function(e){print(paste('Error:', kk))})}
+
 #
 ###################tran-induced change##########################################################
 #"decompose_own"  is used to detrend and deseasonalize; 
@@ -546,7 +550,7 @@ cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   t2 = proc.time()
   print((t2 - t1)[3]/60)
   
-  outna = '3Month_no_ra_sm1_sm0_pr0_tran0_mrro0_ano_3mon_sen_mean_decompose_own_tas_by_sm_first30yr_win_'
+  outna = 'Tran_induced_changes_'
   setwd('/GPUFS/ygo_fwf_1/00junli/01next_step/10results')
   saveRDS(lmf_contribution[[01]], paste(outna, scenario, '_',modelna[01], window_yr,sep=''))
   saveRDS(lmf_contribution[[02]], paste(outna, scenario, '_',modelna[02], window_yr,sep=''))
@@ -869,7 +873,7 @@ cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr)
   t2 = proc.time()
   print((t2 - t1)[3]/60)
   
-  outna = 'Albedo_induce_change_3mon_'
+  outna = 'Albedo_induce_change_'
   setwd('/GPUFS/ygo_fwf_1/00junli/01next_step/10results_Albedo_induce_change')
   saveRDS(lmf_contribution[[01]], paste(outna, scenario, '_',modelna[01], window_yr,sep=''))
   saveRDS(lmf_contribution[[02]], paste(outna, scenario, '_',modelna[02], window_yr,sep=''))
@@ -892,7 +896,10 @@ cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr)
   rm(lmf_contribution)
   gc()
 }
-
+                 
+#There are examples.                
+#cal_tran_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)
+##cal_albedo_induced_change(fpall, modelna, '_ssp585_', 17, window_yr=30)             
 ##
 ###################lmf Prediction####################################################
 #This function is used for LMF prediction related to vegetation greening across all modelled datasets. 
@@ -1064,13 +1071,7 @@ lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=30, out
   print((t2 - t1)[3]/60)
 }
 
-##
-###################Tran alb variability and cov ############################
-
-#Tran_ano_plsr('_ssp585_', window_yr=30, 23)
-#Tran_ano_plsr('_ssp370_', window_yr=30, 23)
-#Tran_ano_plsr('_ssp245_', window_yr=30, 23)
-#Tran_ano_plsr('_ssp126_', window_yr=30, 23)
-
-
+#This is an example.
+#lmf_pre1(rena585_0.95_30, tran_indc585_30yr, modelna, threshold=0.95, window_yr=30, 'Pre_sm_ta_sd_together_ssp585_')
+                 
 
