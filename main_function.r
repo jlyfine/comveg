@@ -13,14 +13,13 @@ require(abind)
 #based on the input variables can be directly calculated the required results
 ###################lmf calculation###############################
 
-#This function is used for LMF calculation and  decomposition.
-#'fpall' is the file path that contains the CMIP6 simulation data. The data is a 3-dimensional array during historical (1850-2014) and future (2015-2100) periods for each model.
-#'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
-#'modelnai' is the model name used to load the CMIP6 data.
-#'threshold' is used to define compound dry-hot events, such as 0.9.
+#This function is used for LMF calculation and  decomposition across all CMIP6-used datasets based on parallel computation.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data are in the form of three-dimensional data in historical (1850-2014) and future (2015-2100) periods for each model.
+#'scenario' is the CMIP6 scenario, i.e., '_ssp585_', '_ssp126_', and '_ssp245_'. This is used to read data
+#'modelnai' is the model name. This is also used to load the CMIP6 data.
+#'threshold' defines compound dry-hot events, such as 0.9.
 #'window_yr' is a moving window used for calculating compound events. 
-#'get_lmf_all' function contains a small function, i.e., 'get_lmf_ij_sd' is used for LMF calculation and decomposition at each grid, in which 'i' and 'j' are grid locations, and share the 
-#the same parameter as 'get_lmf_all' function
+#'get_lmf_all' function contains a small function, i.e., 'get_lmf_ij_sd' is used for LMF calculation and decomposition at each grid; In this function, 'i' and 'j' are grid locations, and the remaining parameters are same as 'get_lmf_all' function
 
 get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, window_yr=40){
   t1 = proc.time()
@@ -207,11 +206,12 @@ get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, wi
 
 #
 ###################tran-induced change##########################################################
-#'decompose_own'  is used to detrend and deseasonalize, 
-#in which x is time series from CMIP6 data; window_yr' is moving window. 
-decompose_own = function(x, type = "additive", window_yr){
+#"decompose_own"  is used to detrend and deseasonalize; 
+#"x" is time series from CMIP6 data; 
+#"window_yr" is moving window. 
+decompose_own = function(x, window_yr){
   #We eliminated the mean seasonality from the first 30-year period, along with the long-term trends.
-  
+  type = "additive"
   filter = NULL
   #x = x_mrso_ij
   type <- match.arg(type)
@@ -246,17 +246,16 @@ decompose_own = function(x, type = "additive", window_yr){
                  figure = figure, type = type), class = "decomposed.ts")
 }
 
-#'al_tran_induced_change' and 'cal_albedo_induced_change' are used to calculate Tran-induced or albedo-induced changes.
-#'fpall' is the file path that contains the CMIP6 simulation data. The data is 3-dimensional array.
-#'scenario' is the CMIP6 scenario, such as '_ssp585_', '_ssp126_', and '_ssp245_'.
-#'modelna' is the model name used to load the CMIP6 data.
+#'al_tran_induced_change' and 'cal_albedo_induced_change' are used to calculate Tran-induced or albedo-induced changes across all used datasets based on parallel computation, respectively.
+#'fpall' is the file path that contains the CMIP6 simulation data. The data are in the form of three-dimensional data in historical (1850-2014) and future (2015-2100) periods for each model.
+#'scenario' is the CMIP6 scenario,i.e., '_ssp585_', '_ssp126_', and '_ssp245_'.
+#'modelna' is the model name for loading the CMIP6 data.
 #'core1' is used to define the core for parallel.
 #'window_yr' is a moving window used for calculating compound events. 
-#'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', 
-#in which share the same parameters, and this function is used to obtain tran-induced changes based on water and energy balance equations.
-#'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', 
-#in which share the same parameters, and this function is used to obtain albedo-induced changes based on water and energy balance equations.
-
+#'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', sharing the same parameters; This function is used to obtain Tran-induced changes for each CMIP6 model based on water and energy balance equations.
+#'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', sharing the same parameters; This function is used to obtain albedo-induced changes for each CMIP6 model based on water and energy balance equations.
+#Please see our paper to get the detained information on water and energy balance equation. 
+                 
 cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
   
@@ -896,16 +895,15 @@ cal_albedo_induced_change = function(fpall, modelna, scenario, core1, window_yr)
 
 ##
 ###################lmf Prediction####################################################
-#This function is used to LMF prediction related to vegetation greening. 
-#'rena' is the data output from 'get_lmf_all' function, in which data have each individual LMFs and the associated changes.
+#This function is used for LMF prediction related to vegetation greening across all modelled datasets. 
+#'rena' is the data output from the 'get_lmf_all' function, in which data have each LMF and the associated changes.
 #'lai_gs_indc' is the data of Tran-induced or albedo-induced changes from the above two functions.
-#Tran-induced or albedo-induced changes.
-#'threshold' is used to defined compound dry-hot events, such as 0.9.
-#'window_yr' is moving window used for calculating compound events. 
+#'threshold' is used to define compound dry-hot events, such as 0.9.
+#'window_yr' is a moving window used for calculating compound events. 
 #'out_na' is output file name.
-#There are two small function, i.e., 'get_da' and 'cal_re'.
-#'get_da' is used for LMF prediction at each grid cell. The associated inputs are from 'cal_re' function. Few fitting equations yield intercepts marginally exceeding or falling zero, and the Tran-induced changes are comparatively modest, we opt to deduct the prediction model intercept to avoid the potential underestimation or overestimation in predictions. 
-#'cal_re' generally have the same input variables as 'lmf_pre1'.
+#There are two small functions, i.e., 'get_da' and 'cal_re'.
+#'get_da' is used for LMF prediction at each grid cell. The associated inputs are from the 'cal_re' function. Few fitting equations yield intercepts marginally exceeding or falling zero, and the Tran-induced changes are comparatively modest, we opt to deduct the prediction model intercept to avoid the potential underestimation or overestimation in predictions. 
+#'cal_re' generally has the same input variables as 'lmf_pre1'.
 
 lmf_pre1 = function(rena, lai_gs_indc, modelna, threshold=0.9, window_yr=30, out_na){
   t1 = proc.time()
