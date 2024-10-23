@@ -9,8 +9,7 @@ require(pls)
 require(segmented)
 require(abind)
 
-#The big function is encompassed by several small functions, 
-#based on the input variables can be directly calculated the required results
+#The big function is encompassed by several small functions; The desired result can be calculated directly using the input variables.
 ###################lmf calculation###############################
 
 #This function is used for LMF calculation and  decomposition across all CMIP6-used datasets based on parallel computation.
@@ -18,7 +17,7 @@ require(abind)
 #'scenario' is the CMIP6 scenario, i.e., '_ssp585_', '_ssp126_', and '_ssp245_'. This is used to read data
 #'modelnai' is the model name. This is also used to load the CMIP6 data.
 #'threshold' defines compound dry-hot events, such as 0.9.
-#'window_yr' is a moving window used for calculating compound events. 
+#'window_yr' is a moving window used for calculating compound events, such as 30 years. 
 #'get_lmf_all' function contains a small function, i.e., 'get_lmf_ij_sd' is used for LMF calculation and decomposition at each grid; In this function, 'i' and 'j' are grid locations, and the remaining parameters are same as 'get_lmf_all' function
 
 get_lmf_all = function(fpall, scenario = '_ssp585_', modelnai, threshold=0.9, window_yr=40){
