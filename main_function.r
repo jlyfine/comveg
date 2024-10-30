@@ -249,15 +249,6 @@ decompose_own = function(x, window_yr){
                  figure = figure, type = type), class = "decomposed.ts")
 }
 
-#'al_tran_induced_change' and 'cal_albedo_induced_change' are used to calculate Tran-induced or albedo-induced changes across all used datasets based on parallel computation, respectively.
-#'fpall' is the file path that contains the CMIP6 simulation data. The data are in the form of three-dimensional data in historical (1850-2014) and future (2015-2100) periods for each model.
-#'scenario' is the CMIP6 scenario,i.e., '_ssp585_', '_ssp126_', and '_ssp245_'.
-#'modelna' is the model name for loading the CMIP6 data.
-#'core1' is used to define the core for parallel.
-#'window_yr' is a moving window used for calculating compound events. 
-#'get_re_sm_mean_g' function contains a small function in 'cal_tran_induced_change', sharing the same parameters; This function is used to obtain Tran-induced changes for each CMIP6 model based on water and energy balance equations.
-#'get_re_sm_alb_g' function contains a small function in 'cal_albedo_induced_change', sharing the same parameters; This function is used to obtain albedo-induced changes for each CMIP6 model based on water and energy balance equations.
-#Please see our paper to get detailed information on the water and energy balance equation. 
 
 #The functions "cal_tran_induced_change" and "cal_albedo_induced_change" are utilized to compute the Tran-induced and albedo-induced changes, respectively, across all datasets employed, leveraging parallel computation.
 #The variable "fpall" denotes the file path containing the CMIP6 simulation data, which is structured as three-dimensional arrays representing both historical (1850-2014) and future (2015-2100) periods for each model.
@@ -268,7 +259,6 @@ decompose_own = function(x, window_yr){
 #The function "get_re_sm_mean_g", which is integrated within "cal_tran_induced_change", shares the same parameters and is employed to derive tran-induced changes for each CMIP6 model based on water and energy balance equations. 
 #Similarly, the function "get_re_sm_alb_g", contained within "cal_albedo_induced_change", utilizes the same parameters to obtain albedo-induced changes for each CMIP6 model, also grounded in the water and energy balance equations.
 #For a comprehensive understanding of the water and energy balance equations, please refer to our published paper.
-  
 cal_tran_induced_change = function(fpall, modelna, scenario, core1, window_yr){
   
   
