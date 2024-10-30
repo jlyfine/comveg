@@ -10,7 +10,7 @@ require(segmented)
 require(abind)
 
 #Please note that:
-#The overarching function is composed of multiple constituent functions; the intended outcome can be computed directly from the input variables.
+#The overarching function is composed of one or two constituent functions; the intended outcome can be computed directly from the input variables.
 ###################lmf calculation###############################
 
 #This function is designed for the calculation of the LMF and its decomposition across all datasets utilized in CMIP6, employing parallel computation.
